@@ -1,0 +1,65 @@
+{
+  "_doc": "Copy to workflow-updates/manifest.json and fill in file paths after exporting JSON from Floyo.",
+  "items": [
+    {
+      "workflow_id": "46201eba-a692-4964-a193-db81cf8c9954",
+      "expected_name": "Video Masking with Sam2 Comparison",
+      "workflow_json": "46201eba-a692-4964-a193-db81cf8c9954/workflow.json",
+      "prompt": "46201eba-a692-4964-a193-db81cf8c9954/prompt.json"
+    },
+    {
+      "workflow_id": "0190bfea-870c-4ddd-872d-eef1a47089e0",
+      "expected_name": "Wan 2.1 Text2Image",
+      "workflow_json": "0190bfea-870c-4ddd-872d-eef1a47089e0/workflow.json",
+      "prompt": "0190bfea-870c-4ddd-872d-eef1a47089e0/prompt.json"
+    },
+    {
+      "workflow_id": "d5270497-2071-41a7-82b4-c8b1932557b7",
+      "expected_name": "Flux Text to Character Sheet",
+      "workflow_json": "d5270497-2071-41a7-82b4-c8b1932557b7/workflow.json",
+      "prompt": "d5270497-2071-41a7-82b4-c8b1932557b7/prompt.json"
+    },
+    {
+      "workflow_id": "d02d523f-4798-48de-bfeb-428536cfc067",
+      "expected_name": "Text to Character Sheet with a reference LoRA",
+      "workflow_json": "d02d523f-4798-48de-bfeb-428536cfc067/workflow.json",
+      "prompt": "d02d523f-4798-48de-bfeb-428536cfc067/prompt.json"
+    },
+    {
+      "workflow_id": "441247a5-48a5-4550-938c-154fb2e62fb7",
+      "expected_name": "Sketch to Image",
+      "workflow_json": "441247a5-48a5-4550-938c-154fb2e62fb7/workflow.json",
+      "prompt": "441247a5-48a5-4550-938c-154fb2e62fb7/prompt.json"
+    },
+    {
+      "workflow_id": "d25f85e0-2ef9-4a88-9474-e2d155e15db0",
+      "expected_name": "Image Redux with Flux",
+      "workflow_json": "d25f85e0-2ef9-4a88-9474-e2d155e15db0/workflow.json",
+      "prompt": "d25f85e0-2ef9-4a88-9474-e2d155e15db0/prompt.json"
+    },
+    {
+      "workflow_id": "02995eae-c82a-41de-bdb4-2a866539caef",
+      "expected_name": "Image Upscaler with LoRA",
+      "workflow_json": "02995eae-c82a-41de-bdb4-2a866539caef/workflow.json",
+      "prompt": "02995eae-c82a-41de-bdb4-2a866539caef/prompt.json"
+    },
+    {
+      "workflow_id": "a9a59264-5241-4d86-ba60-2ac20243aafa",
+      "expected_name": "Image Inpainting with LoRA",
+      "workflow_json": "a9a59264-5241-4d86-ba60-2ac20243aafa/workflow.json",
+      "prompt": "a9a59264-5241-4d86-ba60-2ac20243aafa/prompt.json"
+    },
+    {
+      "workflow_id": "9cc5661f-0709-471b-afa0-7a1a02c077dd",
+      "expected_name": "MMAudio: Video to Synced Audio",
+      "workflow_json": "9cc5661f-0709-471b-afa0-7a1a02c077dd/workflow.json",
+      "prompt": "9cc5661f-0709-471b-afa0-7a1a02c077dd/prompt.json"
+    },
+    {
+      "workflow_id": "5e0b92cb-0b33-42b8-ba24-52c976066ca4",
+      "expected_name": "Video to Video with Camera Control with Wan",
+      "workflow_json": "5e0b92cb-0b33-42b8-ba24-52c976066ca4/workflow.json",
+      "prompt": "5e0b92cb-0b33-42b8-ba24-52c976066ca4/prompt.json"
+    }
+  ]
+}

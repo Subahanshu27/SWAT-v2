@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.env
+.env.*
+!.env.production.example
+workflow-backups
+docs
+*.log
+npm-debug.log*
+.DS_Store
+deploy/prod/release

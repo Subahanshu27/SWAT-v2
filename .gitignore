@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+prompt-service/node_modules/
+
+# Next.js
+.next/
+out/
+build/
+
+# Secrets — never commit
+.env
+.env.*
+!.env.production.example
+prompt-service/.env
+
+# Local / generated
+.DS_Store
+*.pem
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.vercel
+
+# Deploy artifacts
+deploy/prod/release/
+
+# Local dev-only (keep in Swat_Prod, not this repo)
+workflow-backups/
+docs/

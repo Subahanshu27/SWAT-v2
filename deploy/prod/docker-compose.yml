@@ -1,0 +1,66 @@
+services:
+  prompt-service:
+    build:
+      context: ../..
+      dockerfile: deploy/prod/Dockerfile.prompt-service
+    container_name: swat2-prompt-service
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+      - PORT=8788
+      - SWAT_BASELINE_MODE=prompt_changed
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://127.0.0.1:8788/health',
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  app:
+    build:
+      context: ../..
+      dockerfile: deploy/prod/Dockerfile
+      args:
+        - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+        - NEXT_PUBLIC_MAIN_SITE_DOMAIN=${NEXT_PUBLIC_MAIN_SITE_DOMAIN}
+        - NEXT_PUBLIC_SUPABASE_COOKIE_DOMAIN=${NEXT_PUBLIC_SUPABASE_COOKIE_DOMAIN}
+        - NEXT_PUBLIC_GLOBAL_DISPATCHER_URL=${NEXT_PUBLIC_GLOBAL_DISPATCHER_URL}
+    container_name: swat2-app
+    depends_on:
+      prompt-service:
+        condition: service_healthy
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - FLOYO_PROMPT_SERVICE_URL=http://prompt-service:8788/generate-prompt
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://127.0.0.1:3000/api/health',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

@@ -1,0 +1,38 @@
+{
+  "name": "swat2",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "workflow:update": "node scripts/update-workflow-prompt.mjs",
+    "workflow:bulk-update": "node scripts/bulk-update-workflows.mjs",
+    "workflow:normalize-files": "node scripts/normalize-workflow-update-files.mjs",
+    "workflow:init-folders": "node scripts/init-workflow-update-folders.mjs",
+    "workflow:batch": "node scripts/workflow-batch.mjs"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.7.0",
+    "@supabase/supabase-js": "^2.81.0",
+    "@tanstack/react-virtual": "^3.13.0",
+    "next": "^16.0.7",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "react-icons": "^5.3.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "autoprefixer": "^10.4.22",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "^16.0.1",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.4.18",
+    "typescript": "^5.2.0"
+  }
+}

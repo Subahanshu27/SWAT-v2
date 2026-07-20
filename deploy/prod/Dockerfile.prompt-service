@@ -1,0 +1,16 @@
+FROM node:20-alpine
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=8788
+ENV HOST=0.0.0.0
+ENV SWAT_BASELINE_MODE=prompt_changed
+
+COPY prompt-service/package.json prompt-service/package-lock.json* ./prompt-service/
+RUN cd prompt-service && npm ci --omit=dev
+
+COPY prompt-service/ ./prompt-service/
+WORKDIR /app/prompt-service
+
+EXPOSE 8788
+CMD ["node", "server.js"]
