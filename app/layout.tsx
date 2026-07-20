@@ -6,7 +6,7 @@ import AuthGate from '@/components/AuthGate';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'SWAT2 - Workflow Testing',
+  title: 'SWAT - Workflow Testing',
   description: 'Optimized System Workflow Automation Tool',
 };
 

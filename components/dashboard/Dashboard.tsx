@@ -338,7 +338,7 @@ export function Dashboard() {
     <div className="flex h-screen flex-col">
       <header className="flex items-center justify-between border-b border-slate-800 px-6 py-3">
         <div>
-          <h1 className="text-lg font-semibold text-slate-100">SWAT2</h1>
+          <h1 className="text-lg font-semibold text-slate-100">SWAT</h1>
           <p className="text-xs text-slate-500">Workflow regression testing</p>
         </div>
         <div className="flex items-center gap-3">

@@ -1,4 +1,5 @@
 import 'server-only';
+import { baselineBlockCategory, shouldBlockForBaseline } from '@/lib/helpers/baseline';
 import { preflightReason } from '@/lib/helpers/preflight-messages';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { env } from '@/lib/config/env';
@@ -290,23 +291,9 @@ export async function queueBatch(
       continue;
     }
 
-    // We have a prompt, but only run it if it is a trusted, current baseline.
-    // A missing/stale baseline means we would be testing an unverified prompt,
-    // which produces misleading "genuine" failures — so we block instead.
-    if (
-      resolved.baseline === 'missing' ||
-      resolved.baseline === 'stale' ||
-      resolved.baseline === 'outdated' ||
-      resolved.baseline === 'community_input_missing'
-    ) {
-      const category: ErrorCategory =
-        resolved.baseline === 'missing'
-          ? 'prompt_baseline_missing'
-          : resolved.baseline === 'outdated'
-            ? 'prompt_baseline_outdated'
-            : resolved.baseline === 'community_input_missing'
-              ? 'community_input_missing'
-              : 'prompt_baseline_stale';
+    // Block stale/outdated baselines; missing may queue when SWAT_QUEUE_UNVERIFIED is enabled.
+    if (shouldBlockForBaseline(resolved.baseline, env.swat.queueUnverifiedMissing)) {
+      const category = baselineBlockCategory(resolved.baseline!);
       const reason = preflightReason(category);
       await markBlocked(client, batchWorkflowId, category, reason, {
         workflow_id: workflowId,

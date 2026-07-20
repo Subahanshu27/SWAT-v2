@@ -2,6 +2,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { mapPool } from '@/lib/helpers/async-pool';
 import { chunkArray } from '@/lib/helpers/chunk';
+import { baselineBlockCategory, shouldBlockForBaseline } from '@/lib/helpers/baseline';
 import { preflightReason } from '@/lib/helpers/preflight-messages';
 import { env } from '@/lib/config/env';
 import { getWorkflowDefinitions } from './workflow.service';
@@ -97,20 +98,8 @@ async function preflightOne(
       };
     }
 
-    if (
-      resolved.baseline === 'missing' ||
-      resolved.baseline === 'stale' ||
-      resolved.baseline === 'outdated' ||
-      resolved.baseline === 'community_input_missing'
-    ) {
-      const category: ErrorCategory =
-        resolved.baseline === 'missing'
-          ? 'prompt_baseline_missing'
-          : resolved.baseline === 'outdated'
-            ? 'prompt_baseline_outdated'
-            : resolved.baseline === 'community_input_missing'
-              ? 'community_input_missing'
-              : 'prompt_baseline_stale';
+    if (shouldBlockForBaseline(resolved.baseline, env.swat.queueUnverifiedMissing)) {
+      const category = baselineBlockCategory(resolved.baseline!);
 
       return {
         workflowId,

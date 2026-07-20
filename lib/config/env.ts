@@ -52,6 +52,11 @@ export const env = {
     concurrency: Math.max(1, Number(process.env.SWAT_PREFLIGHT_CONCURRENCY || 8) || 8),
   },
 
+  /** Allow queueing when baseline is missing (not stale/outdated). Set SWAT_QUEUE_UNVERIFIED=false to disable. */
+  swat: {
+    queueUnverifiedMissing: process.env.SWAT_QUEUE_UNVERIFIED !== 'false',
+  },
+
   nodeEnv: process.env.NODE_ENV || 'development',
   isProduction: process.env.NODE_ENV === 'production',
   isDevelopment: process.env.NODE_ENV === 'development',
