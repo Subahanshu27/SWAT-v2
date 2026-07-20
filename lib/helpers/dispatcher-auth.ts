@@ -2,6 +2,7 @@ import 'server-only';
 import { cookies } from 'next/headers';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { env } from '@/lib/config/env';
+import { createClient } from '@/lib/supabase/server';
 
 function projectRefFromUrl(url: string): string | null {
   try {
@@ -63,10 +64,44 @@ export async function buildDispatcherAuth(
     if (filtered) headers.Cookie = filtered;
   }
 
+  const cookieStore = await cookies();
   let teamId =
     process.env.DISPATCHER_TEAM_ID?.trim() ||
-    (await cookies()).get('x-team-id')?.value ||
+    cookieStore.get('x-team-id')?.value ||
     null;
+
+  // Match legacy SWAT: use the logged-in user's selected_team_id from users_metadata.
+  if (!teamId) {
+    try {
+      const authClient = await createClient();
+      const {
+        data: { user },
+      } = await authClient.auth.getUser();
+      if (user) {
+        const { data: userMetadata } = await authClient
+          .from('users_metadata')
+          .select('selected_team_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        teamId = userMetadata?.selected_team_id ?? null;
+        if (teamId) {
+          try {
+            cookieStore.set('x-team-id', teamId, {
+              httpOnly: true,
+              secure: env.isProduction,
+              sameSite: 'lax',
+              path: '/',
+              maxAge: 60 * 60 * 24 * 7,
+            });
+          } catch {
+            // Server Component context — cookie may be set on a later route handler call.
+          }
+        }
+      }
+    } catch {
+      // Fall through to workflow_runs lookup below.
+    }
+  }
 
   if (!teamId && workflowDb && workflowId) {
     const { data } = await workflowDb

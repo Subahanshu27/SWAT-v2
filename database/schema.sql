@@ -53,7 +53,9 @@ ALTER TABLE swat.batch_workflows ADD COLUMN IF NOT EXISTS error_details JSONB;
 ALTER TABLE swat.batches DROP CONSTRAINT IF EXISTS batches_status_check;
 ALTER TABLE swat.batches
   ADD CONSTRAINT batches_status_check
-  CHECK (status IN ('running', 'completed', 'failed', 'pending', 'queued', 'cancelled'));
+  CHECK (status IN ('running', 'completed', 'failed', 'pending', 'cancelled'));
+-- Note: prod may omit 'queued'; SWAT2 maps queued → pending on write via toBatchesTableStatus().
+-- To allow queued on batches: add 'queued' to the CHECK list above.
 
 ALTER TABLE swat.batch_workflows DROP CONSTRAINT IF EXISTS batch_workflows_status_check;
 ALTER TABLE swat.batch_workflows

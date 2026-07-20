@@ -17,6 +17,7 @@ import {
   classifyError,
   deriveBatchStatus,
   mapRunStatusToWorkflowStatus,
+  toBatchesTableStatus,
 } from '@/lib/helpers/status';
 
 interface BatchRow {
@@ -340,7 +341,7 @@ export async function recomputeBatchStatus(
     .sort((a, b) => b - a);
 
   const update: Record<string, unknown> = {
-    status: newStatus,
+    status: toBatchesTableStatus(newStatus),
     total_workflows: total,
     completed_workflows: successCount,
     failed_workflows: failedCount,
@@ -362,14 +363,7 @@ export async function recomputeBatchStatus(
     .update(update)
     .eq('id', batchId);
 
-  // If the DB constraint does not yet allow 'queued', fall back to 'pending'.
-  if (updateError && newStatus === 'queued') {
-    await client
-      .schema('swat')
-      .from('batches')
-      .update({ ...update, status: 'pending' })
-      .eq('id', batchId);
-  }
+  if (updateError) throw updateError;
 }
 
 /**

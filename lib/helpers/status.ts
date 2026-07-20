@@ -95,6 +95,25 @@ export function deriveBatchStatus(statuses: WorkflowStatus[]): BatchStatus {
   return 'completed';
 }
 
+/** Allowed on prod `swat.batches` today (batch_workflows also allows `queued`). */
+const BATCHES_TABLE_STATUSES = new Set<BatchStatus>([
+  'pending',
+  'running',
+  'completed',
+  'failed',
+  'cancelled',
+]);
+
+/**
+ * Map a logical batch status onto a value safe for `swat.batches.status`.
+ * Prod DB constraint omits `queued` — persist `pending` instead.
+ */
+export function toBatchesTableStatus(status: BatchStatus): BatchStatus {
+  if (BATCHES_TABLE_STATUSES.has(status)) return status;
+  if (status === 'queued') return 'pending';
+  return 'pending';
+}
+
 /**
  * Decide whether a failed workflow is a genuine workflow error or SWAT/infra
  * noise, based on the error_details payload we stored at queue time.
