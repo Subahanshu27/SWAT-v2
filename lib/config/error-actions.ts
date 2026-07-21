@@ -19,7 +19,8 @@ export const ERROR_BUCKET_ACTIONS: Record<string, ErrorAction> = {
     severity: 'retry',
   },
   infra_auth: {
-    action: 'Dispatcher auth failed — check DISPATCHER_AUTH_ACCESS_TOKEN and DISPATCHER_TEAM_ID in Swat_Prod/.env.',
+    action:
+      'Dispatcher auth failed — check DISPATCHER_BACKEND_TOKEN, DISPATCHER_TEAM_ID, and DISPATCHER_USER_ID in .env.',
     severity: 'fix',
   },
   infra_unknown: {

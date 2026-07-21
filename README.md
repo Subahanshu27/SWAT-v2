@@ -47,8 +47,9 @@ Required:
 | `NEXT_PUBLIC_GLOBAL_DISPATCHER_URL` | `https://swat.dispatch.floyo.ai` |
 | `FLOYO_PROMPT_SERVICE_URL` | `http://127.0.0.1:8788/generate-prompt` |
 | `SWAT_BASELINE_MODE` | `prompt_changed` |
-| `DISPATCHER_TEAM_ID` | Floyo team UUID |
-| `DISPATCHER_AUTH_ACCESS_TOKEN` | Prod JWT (refresh when expired) |
+| `DISPATCHER_BACKEND_TOKEN` | Same as GD `BACKEND_TOKEN` (`x-backend-token`) |
+| `DISPATCHER_TEAM_ID` | Floyo team UUID (`x-team-id`) |
+| `DISPATCHER_USER_ID` | Floyo user UUID for run attribution (`x-user-id`) |
 
 `NEXT_PUBLIC_*` values are embedded at **build time** — set `.env` before `npm run build`.
 

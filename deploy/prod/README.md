@@ -46,8 +46,9 @@ cp deploy/prod/.env.production.example .env
 | `NEXT_PUBLIC_GLOBAL_DISPATCHER_URL` | local / dispatch.floyo.ai | **`https://swat.dispatch.floyo.ai`** |
 | `FLOYO_PROMPT_SERVICE_URL` | `http://127.0.0.1:8788/...` | **`http://127.0.0.1:8788/...`** (same host) |
 | `SWAT_BASELINE_MODE` | `prompt_changed` | **`prompt_changed`** |
+| `DISPATCHER_BACKEND_TOKEN` | GD `BACKEND_TOKEN` | same secret as this host’s GD |
 | `DISPATCHER_TEAM_ID` | Flothisia UUID | your prod team |
-| `DISPATCHER_AUTH_ACCESS_TOKEN` | JWT from Floyo session | refresh when expired |
+| `DISPATCHER_USER_ID` | Floyo user UUID | user in that team for run attribution |
 
 `NEXT_PUBLIC_*` vars are **baked in at build time** — set them in `.env` **before** `npm run build`.
 
@@ -131,7 +132,7 @@ App on `:3000`. Put nginx in front for TLS/domain.
 - [ ] Login via floyo.ai session works (cookie domain `.floyo.ai`)
 - [ ] Preflight / Re-check calls prompt-service (no `baseline: missing` for known-good workflows)
 - [ ] Queue dispatches to `swat.dispatch.floyo.ai`
-- [ ] `DISPATCHER_AUTH_ACCESS_TOKEN` not expired
+- [ ] `DISPATCHER_BACKEND_TOKEN` / `DISPATCHER_TEAM_ID` / `DISPATCHER_USER_ID` set
 - [ ] PM2 survives reboot: `pm2 startup` + `pm2 save`
 
 ---

@@ -38,7 +38,14 @@ export const env = {
   dispatcher: {
     url: process.env.NEXT_PUBLIC_GLOBAL_DISPATCHER_URL || '',
     teamId: process.env.DISPATCHER_TEAM_ID || '',
-    accessToken: process.env.DISPATCHER_AUTH_ACCESS_TOKEN || '',
+    /** Floyo user UUID used for workflow_run attribution via x-user-id. */
+    userId: process.env.DISPATCHER_USER_ID || '',
+    /**
+     * Shared machine secret with global-dispatcher (x-backend-token).
+     * Prefer DISPATCHER_BACKEND_TOKEN; BACKEND_TOKEN accepted as alias.
+     */
+    backendToken:
+      process.env.DISPATCHER_BACKEND_TOKEN || process.env.BACKEND_TOKEN || '',
   },
 
   // Optional runtime prompt generation service. When set, SWAT2 asks this
