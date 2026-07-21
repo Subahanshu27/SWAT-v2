@@ -36,6 +36,8 @@ export interface QueueAuthSnapshot {
   teamId: string | null;
   /** When set, bearer comes from env (no refresh). */
   envAccessToken: string | null;
+  /** Supabase auth cookies captured at queue start (prod dispatcher expects these). */
+  authCookieHeader: string | null;
 }
 
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;
@@ -103,9 +105,13 @@ function authHeadersFromSnapshot(snapshot: QueueAuthSnapshot, teamId: string | n
     host: new URL(env.dispatcher.url).host,
   };
 
-  const token = snapshot.envAccessToken || snapshot.accessToken;
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  // Match pre-eb13212 behavior: env bearer OR browser cookies (not session bearer alone).
+  if (snapshot.envAccessToken) {
+    headers.Authorization = `Bearer ${snapshot.envAccessToken}`;
+  } else if (snapshot.authCookieHeader) {
+    headers.Cookie = snapshot.authCookieHeader;
+  } else if (snapshot.accessToken) {
+    headers.Authorization = `Bearer ${snapshot.accessToken}`;
   }
 
   if (teamId) headers['x-team-id'] = teamId;
@@ -126,8 +132,21 @@ export async function prepareQueueAuth(
   let accessToken: string | null = envAccessToken;
   let refreshToken: string | null = null;
   let expiresAtMs: number | null = null;
+  let authCookieHeader: string | null = null;
 
   if (!envAccessToken) {
+    const authProjectRef =
+      projectRefFromUrl(env.supabase.url) ||
+      projectRefFromUrl(env.supabase.dataUrl) ||
+      process.env.DISPATCHER_SUPABASE_PROJECT_ID ||
+      null;
+
+    if (authProjectRef) {
+      const cookieStore = await cookies();
+      const filtered = filterAuthCookies(cookieStore.getAll(), authProjectRef);
+      authCookieHeader = filtered || null;
+    }
+
     const authClient = await createClient();
     const {
       data: { session },
@@ -136,13 +155,15 @@ export async function prepareQueueAuth(
       accessToken = session.access_token;
       refreshToken = session.refresh_token ?? null;
       expiresAtMs = session.expires_at ? session.expires_at * 1000 : null;
+    } else {
+      accessToken = null;
     }
   }
 
   const authClient = await createClient();
   const teamId = await resolveTeamId(authClient, workflowDb, workflowId);
 
-  return { accessToken, refreshToken, expiresAtMs, teamId, envAccessToken };
+  return { accessToken, refreshToken, expiresAtMs, teamId, envAccessToken, authCookieHeader };
 }
 
 /** Refresh access token when near expiry (long batch queue runs). */
@@ -199,7 +220,7 @@ export async function buildDispatcherAuthFromSnapshot(
   }
 
   const headers = authHeadersFromSnapshot(snapshot, teamId);
-  const hasAuth = !!(snapshot.envAccessToken || snapshot.accessToken);
+  const hasAuth = !!(snapshot.envAccessToken || snapshot.authCookieHeader || snapshot.accessToken);
 
   if (!hasAuth) {
     return {
