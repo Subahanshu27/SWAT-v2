@@ -2,6 +2,7 @@ import { type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { swatClient, workflowClient } from '@/lib/supabase/clients';
 import { requireAdmin } from '@/lib/helpers/auth';
+import { prepareQueueAuth } from '@/lib/helpers/dispatcher-auth';
 import { createBatch, listBatches } from '@/lib/services/batch.service';
 import { queueBatch } from '@/lib/services/queue.service';
 import { errorResponse, successResponse } from '@/lib/helpers/response';
@@ -48,18 +49,23 @@ export async function POST(request: NextRequest) {
       createdBy: auth.user.id,
     });
 
-    let queueResults;
+    let queuedImmediately = false;
     if (parsed.data.runImmediately) {
-      queueResults = await queueBatch(
+      const authSnapshot = await prepareQueueAuth(wf, parsed.data.workflowIds[0]);
+      queueBatch(
         swatClient,
         batch.id,
         parsed.data.workflowIds,
         parsed.data.sequence,
-        wf
-      );
+        wf,
+        authSnapshot
+      ).catch((err) => {
+        console.error(`[SWAT queue] Background queue failed for batch ${batch.id}:`, err);
+      });
+      queuedImmediately = true;
     }
 
-    return successResponse({ batch, queueResults }, 'Batch created', 201);
+    return successResponse({ batch, queued: queuedImmediately, count: parsed.data.workflowIds.length }, 'Batch created', 201);
   } catch (err) {
     return errorResponse((err as Error).message, 500);
   }

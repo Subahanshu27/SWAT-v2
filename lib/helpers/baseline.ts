@@ -1,15 +1,14 @@
 import type { ErrorCategory, PromptBaseline } from '@/types';
 
-const ALWAYS_BLOCKED: PromptBaseline[] = ['stale', 'outdated', 'community_input_missing'];
-
-/** When true, workflows with missing baseline may queue (stale/outdated still blocked). */
-export function shouldBlockForBaseline(
-  baseline: PromptBaseline | undefined,
-  queueUnverifiedMissing: boolean
-): boolean {
+/** Block queueing when baseline is missing, stale, outdated, or community input missing. */
+export function shouldBlockForBaseline(baseline: PromptBaseline | undefined): boolean {
   if (!baseline || baseline === 'exact') return false;
-  if (baseline === 'missing') return !queueUnverifiedMissing;
-  return ALWAYS_BLOCKED.includes(baseline);
+  return (
+    baseline === 'missing' ||
+    baseline === 'stale' ||
+    baseline === 'outdated' ||
+    baseline === 'community_input_missing'
+  );
 }
 
 export function baselineBlockCategory(baseline: PromptBaseline): ErrorCategory {

@@ -1,9 +1,13 @@
 import 'server-only';
 import { baselineBlockCategory, shouldBlockForBaseline } from '@/lib/helpers/baseline';
+import {
+  buildDispatcherAuthFromSnapshot,
+  ensureFreshQueueAuth,
+  prepareQueueAuth,
+  type QueueAuthSnapshot,
+} from '@/lib/helpers/dispatcher-auth';
 import { preflightReason } from '@/lib/helpers/preflight-messages';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { env } from '@/lib/config/env';
-import { buildDispatcherAuth } from '@/lib/helpers/dispatcher-auth';
 import { getWorkflowDefinitions } from './workflow.service';
 import { resolvePrompt } from './prompt.service';
 import { recomputeBatchStatus } from './batch.service';
@@ -195,7 +199,8 @@ export async function queueBatch(
   batchId: string,
   workflowIds: string[],
   sequence?: string,
-  workflowDb: SupabaseClient = client
+  workflowDb: SupabaseClient = client,
+  authSnapshot?: QueueAuthSnapshot | null
 ): Promise<QueueResult[]> {
   if (!workflowIds.length) return [];
   if (!env.dispatcher.url) {
@@ -227,6 +232,7 @@ export async function queueBatch(
   const defById = new Map(defs.map((d) => [d.id, d]));
 
   const results: QueueResult[] = [];
+  let queueAuth = authSnapshot ?? null;
 
   for (let i = 0; i < workflowIds.length; i++) {
     const workflowId = workflowIds[i];
@@ -291,8 +297,8 @@ export async function queueBatch(
       continue;
     }
 
-    // Block stale/outdated baselines; missing may queue when SWAT_QUEUE_UNVERIFIED is enabled.
-    if (shouldBlockForBaseline(resolved.baseline, env.swat.queueUnverifiedMissing)) {
+    // Block missing/stale/outdated baselines before dispatch.
+    if (shouldBlockForBaseline(resolved.baseline)) {
       const category = baselineBlockCategory(resolved.baseline!);
       const reason = preflightReason(category);
       await markBlocked(client, batchWorkflowId, category, reason, {
@@ -317,7 +323,13 @@ export async function queueBatch(
       time_in_queue: null,
     });
 
-    const dispatcherAuth = await buildDispatcherAuth(workflowDb, workflowId);
+    if (!queueAuth) {
+      queueAuth = await prepareQueueAuth(workflowDb, workflowId);
+    } else {
+      queueAuth = await ensureFreshQueueAuth(queueAuth);
+    }
+
+    const dispatcherAuth = await buildDispatcherAuthFromSnapshot(queueAuth, workflowDb, workflowId);
     if (!dispatcherAuth.ready) {
       await markFailed(
         client,

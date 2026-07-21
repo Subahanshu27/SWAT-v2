@@ -98,7 +98,7 @@ async function preflightOne(
       };
     }
 
-    if (shouldBlockForBaseline(resolved.baseline, env.swat.queueUnverifiedMissing)) {
+    if (shouldBlockForBaseline(resolved.baseline)) {
       const category = baselineBlockCategory(resolved.baseline!);
 
       return {

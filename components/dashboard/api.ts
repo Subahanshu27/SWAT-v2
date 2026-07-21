@@ -15,7 +15,18 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
   });
-  const json = (await res.json()) as ApiResponse<T>;
+  const text = await res.text();
+  let json: ApiResponse<T>;
+  try {
+    json = JSON.parse(text) as ApiResponse<T>;
+  } catch {
+    const preview = text.trimStart().slice(0, 80);
+    throw new Error(
+      res.ok
+        ? 'Server returned a non-JSON response'
+        : `Request failed (${res.status})${preview.startsWith('<') ? ' — gateway timeout or HTML error page' : ''}`
+    );
+  }
   if (!res.ok || !json.success) {
     throw new Error(json.error || `Request failed (${res.status})`);
   }
@@ -77,7 +88,7 @@ export const api = {
     }),
 
   queueBatch: (batchId: string, body: { workflowIds?: string[]; sequence?: string } = {}) =>
-    request<{ results: unknown[] }>(`/api/batches/${batchId}/queue`, {
+    request<{ queued: boolean; count: number; batchId?: string }>(`/api/batches/${batchId}/queue`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
