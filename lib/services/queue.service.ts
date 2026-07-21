@@ -7,6 +7,7 @@ import {
   type QueueAuthSnapshot,
 } from '@/lib/helpers/dispatcher-auth';
 import { preflightReason } from '@/lib/helpers/preflight-messages';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { env } from '@/lib/config/env';
 import { getWorkflowDefinitions } from './workflow.service';
 import { resolvePrompt } from './prompt.service';
