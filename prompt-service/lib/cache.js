@@ -8,7 +8,13 @@ let misses = 0;
 
 function deriveStatus(value) {
   if (!value || typeof value !== 'object') return 'unknown';
-  if (value.category === 'community_input_missing') return 'blocked';
+  if (
+    value.category === 'community_input_missing' ||
+    value.category === 'invalid_prompt_files' ||
+    value.baseline === 'community_input_missing'
+  ) {
+    return 'blocked';
+  }
   if (value.trusted || value.baseline === 'exact') return 'trusted';
   if (value.baseline === 'outdated') return 'outdated';
   if (value.baseline === 'stale' || value.baseline === 'missing') return 'blocked';

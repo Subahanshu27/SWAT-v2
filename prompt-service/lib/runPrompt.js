@@ -314,19 +314,22 @@ export function detectOutdatedBaseline(trustedRun, latestRun, recentRuns = [], w
   };
 }
 
+const PROMPT_FILE_PREFIXES = ['#community_inputs/', '#inputs/'];
+
 /**
- * Extract all #community_inputs/ file paths from a prompt JSON object.
+ * Extract #community_inputs/ and #inputs/ file paths from a prompt JSON object.
  * Walks parsed JSON so filenames with spaces/parentheses stay intact.
  */
-export function extractCommunityInputPaths(promptJson) {
+export function extractPromptFilePaths(promptJson) {
   const paths = new Set();
   const parsed =
     typeof promptJson === 'string' ? parseMaybeJson(promptJson) ?? promptJson : promptJson;
 
   function walk(value) {
     if (typeof value === 'string') {
-      if (value.startsWith('#community_inputs/')) {
-        paths.add(value.trim());
+      const trimmed = value.trim();
+      if (PROMPT_FILE_PREFIXES.some((p) => trimmed.startsWith(p))) {
+        paths.add(trimmed);
       }
       return;
     }
@@ -344,7 +347,7 @@ export function extractCommunityInputPaths(promptJson) {
   // Fallback: extract quoted JSON strings (handles unparsed prompt blobs).
   if (paths.size === 0) {
     const jsonStr = typeof promptJson === 'string' ? promptJson : JSON.stringify(promptJson);
-    const quoted = /"#community_inputs\/(?:[^"\\]|\\.)*"/g;
+    const quoted = /"#(?:community_inputs|inputs)\/(?:[^"\\]|\\.)*"/g;
     let match;
     while ((match = quoted.exec(jsonStr)) !== null) {
       try {
@@ -358,22 +361,30 @@ export function extractCommunityInputPaths(promptJson) {
   return Array.from(paths);
 }
 
+/** @deprecated use extractPromptFilePaths — kept for older imports */
+export function extractCommunityInputPaths(promptJson) {
+  return extractPromptFilePaths(promptJson).filter((p) => p.startsWith('#community_inputs/'));
+}
+
 /**
  * Convert a Comfy prompt path to a file_system_items.full_path.
  * e.g. "#community_inputs/abc/file.png" → "community_inputs/abc/file.png"
  *
- * Floyo stores community inputs in file_system_items (+ R2 via storage_object_id),
+ * Floyo stores these in file_system_items (+ R2 via storage_object_id),
  * NOT in a Supabase Storage bucket named "community_inputs".
  */
 export function communityInputFullPath(rawPath) {
   return rawPath.replace(/^#/, '');
 }
 
+export const promptFileFullPath = communityInputFullPath;
+
 /**
- * Check if community input files exist via file_system_items (prod source of truth).
+ * Check if prompt file refs exist via file_system_items (prod source of truth).
+ * Supports both #community_inputs/ (published, team_id null) and #inputs/ (any team).
  * Returns { allExist: boolean, missing: string[] }
  */
-export async function checkCommunityInputFiles(paths, supabaseClient) {
+export async function checkPromptInputFiles(paths, supabaseClient) {
   if (!paths || paths.length === 0) {
     return { allExist: true, missing: [] };
   }
@@ -385,15 +396,20 @@ export async function checkCommunityInputFiles(paths, supabaseClient) {
 
   for (const rawPath of paths) {
     try {
-      const fullPath = communityInputFullPath(rawPath);
-      const { data, error } = await supabaseClient
+      const fullPath = promptFileFullPath(rawPath);
+      let query = supabaseClient
         .from('file_system_items')
         .select('id, storage_object_id')
         .eq('full_path', fullPath)
         .eq('is_folder', false)
-        .is('deleted_at', null)
-        .is('team_id', null)
-        .maybeSingle();
+        .is('deleted_at', null);
+
+      // Published community inputs are team-null; private #inputs may have a team_id.
+      if (fullPath.startsWith('community_inputs/')) {
+        query = query.is('team_id', null);
+      }
+
+      const { data, error } = await query.limit(1).maybeSingle();
 
       if (error || !data?.storage_object_id) {
         missing.push(rawPath);
@@ -404,6 +420,11 @@ export async function checkCommunityInputFiles(paths, supabaseClient) {
   }
 
   return { allExist: missing.length === 0, missing };
+}
+
+/** @deprecated use checkPromptInputFiles */
+export async function checkCommunityInputFiles(paths, supabaseClient) {
+  return checkPromptInputFiles(paths, supabaseClient);
 }
 
 const RUN_SELECT =

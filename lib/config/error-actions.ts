@@ -28,7 +28,16 @@ export const ERROR_BUCKET_ACTIONS: Record<string, ErrorAction> = {
     severity: 'escalate',
   },
   community_input_missing: {
-    action: 'Re-upload the referenced file in Floyo editor, then Run + Publish.',
+    action: 'File missing from storage — re-upload in Floyo (#inputs or #community_inputs), then Run + Publish.',
+    severity: 'fix',
+  },
+  invalid_prompt_files: {
+    action:
+      'Prompt references files not in storage metadata. Fix #inputs / #community_inputs in Floyo editor, then Run + Publish.',
+    severity: 'fix',
+  },
+  missing_files: {
+    action: 'Referenced input file missing from storage. Re-upload or update paths, then Run + Publish.',
     severity: 'fix',
   },
   stale_baseline: {

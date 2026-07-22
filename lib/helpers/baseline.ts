@@ -14,6 +14,6 @@ export function shouldBlockForBaseline(baseline: PromptBaseline | undefined): bo
 export function baselineBlockCategory(baseline: PromptBaseline): ErrorCategory {
   if (baseline === 'missing') return 'prompt_baseline_missing';
   if (baseline === 'outdated') return 'prompt_baseline_outdated';
-  if (baseline === 'community_input_missing') return 'community_input_missing';
+  if (baseline === 'community_input_missing') return 'invalid_prompt_files';
   return 'prompt_baseline_stale';
 }

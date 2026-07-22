@@ -110,7 +110,10 @@ export async function resolvePrompt(
 
       if (res.ok && json?.success && isApiPromptShape(json.prompt)) {
         let baseline = json.baseline;
-        if (json.category === 'community_input_missing') {
+        if (
+          json.category === 'community_input_missing' ||
+          json.category === 'invalid_prompt_files'
+        ) {
           baseline = 'community_input_missing';
         }
         return {

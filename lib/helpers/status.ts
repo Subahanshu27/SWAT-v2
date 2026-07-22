@@ -43,6 +43,7 @@ export const BASELINE_CATEGORIES = new Set<ErrorCategory>([
   'prompt_baseline_stale',
   'prompt_baseline_outdated',
   'community_input_missing',
+  'invalid_prompt_files',
 ]);
 
 export function isTerminal(status: WorkflowStatus | string | null | undefined): boolean {
@@ -179,6 +180,8 @@ export function deriveErrorBucket(
       return 'outdated_baseline';
     case 'community_input_missing':
       return 'community_input_missing';
+    case 'invalid_prompt_files':
+      return 'invalid_prompt_files';
     case 'infra_error':
       if (statusCode === 401 || statusCode === 403 || /unauthorized|forbidden|auth/i.test(msg)) {
         return 'infra_auth';
@@ -188,6 +191,12 @@ export function deriveErrorBucket(
       if (/timeout|timed out|aborted|econn/i.test(msg)) return 'dispatcher_timeout';
       return 'infra_unknown';
     case 'genuine_workflow_error':
+      if (
+        statusCode === 400 ||
+        /invalid_prompt_files|not found in storage|storage metadata/i.test(msg)
+      ) {
+        return 'invalid_prompt_files';
+      }
       if (/torchcodec/i.test(msg)) return 'torchcodec_missing';
       if (/shape mismatch|nano banana|nanobanana/i.test(msg)) return 'shape_mismatch';
       if (/seedance.*endpoint|stale endpoint/i.test(msg)) return 'stale_endpoint';

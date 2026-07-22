@@ -48,7 +48,8 @@ export type ErrorCategory =
   | 'prompt_baseline_missing' // No successful UI run to establish an exact prompt
   | 'prompt_baseline_stale' // Workflow changed since its last successful UI run
   | 'prompt_baseline_outdated' // Trusted baseline predates current infra / node schema
-  | 'community_input_missing' // Referenced #community_inputs file deleted from storage
+  | 'community_input_missing' // Referenced #community_inputs / #inputs file deleted from storage
+  | 'invalid_prompt_files' // Prompt refs files missing from storage metadata (preflight or GD)
   | 'infra_error' // SWAT/dispatcher/network/auth problem, not the workflow
   | 'none'; // No error
 

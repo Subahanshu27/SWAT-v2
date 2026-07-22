@@ -21,8 +21,8 @@ import {
   classifySwatCategory,
   detectOutdatedBaseline,
   detectWorkflowType,
-  extractCommunityInputPaths,
-  checkCommunityInputFiles,
+  extractPromptFilePaths,
+  checkPromptInputFiles,
 } from './lib/runPrompt.js';
 import { createClient } from '@supabase/supabase-js';
 
@@ -38,14 +38,26 @@ function getSupabaseClient() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-function cacheKey(body) {
-  // Baseline trust checks only need workflow_id — one stable cache entry per workflow.
-  if (body.workflow_id && body.workflow_json == null && body.prompt == null) {
-    const raw = `baseline:${body.workflow_id}:${BASELINE_MODE}`;
-    return createHash('sha256').update(raw).digest('hex');
-  }
+function catalogCacheFingerprint(prompt, workflowJson) {
   const raw = JSON.stringify({
-    w: body.workflow_id || '',
+    p: prompt ?? null,
+    // Prefer a light fingerprint of the graph when present
+    n: Array.isArray(workflowJson?.nodes) ? workflowJson.nodes.length : null,
+  });
+  return createHash('sha256').update(raw).digest('hex').slice(0, 16);
+}
+
+function cacheKey(body, catalog = null) {
+  const workflowId = body.workflow_id || '';
+  if (catalog) {
+    const fp = catalogCacheFingerprint(catalog.prompt, catalog.workflow_json);
+    return createHash('sha256')
+      .update(`catalog:${workflowId}:${BASELINE_MODE}:${fp}`)
+      .digest('hex');
+  }
+  // Fallback before catalog load (should rarely be used for get)
+  const raw = JSON.stringify({
+    w: workflowId,
     j: body.workflow_json,
     p: body.prompt,
     m: BASELINE_MODE,
@@ -149,36 +161,57 @@ function evaluateBaseline(trustedRun, latestRun, recentRuns, body) {
   };
 }
 
-async function checkCommunityInputsBlock(promptJson) {
-  const paths = extractCommunityInputPaths(promptJson);
+async function checkPromptFilesBlock(promptJson) {
+  const paths = extractPromptFilePaths(promptJson);
   if (paths.length === 0) return null;
 
   const supabase = getSupabaseClient();
-  const fileCheck = await checkCommunityInputFiles(paths, supabase);
+  const fileCheck = await checkPromptInputFiles(paths, supabase);
   if (fileCheck.allExist) return null;
 
   return {
     baseline: 'community_input_missing',
-    category: 'community_input_missing',
-    reason: `Referenced file not found — re-upload in Floyo editor, then Run + Publish. Missing: ${fileCheck.missing.join(', ')}`,
+    category: 'invalid_prompt_files',
+    reason: `Referenced file not found in storage — fix paths in Floyo editor, then Run + Publish. Missing: ${fileCheck.missing.join(', ')}`,
     missing_files: fileCheck.missing,
   };
 }
 
+/**
+ * Resolve catalog (workflows table) definition for dispatch.
+ * UI loads from workflows — SWAT must dispatch the same prompt.
+ */
+async function loadCatalogDefinition(body) {
+  let workflowJson = body.workflow_json ?? null;
+  let prompt = body.prompt ?? null;
+
+  if (body.workflow_id && (workflowJson == null || prompt == null)) {
+    const row = await fetchWorkflowDefinition(body.workflow_id);
+    if (row) {
+      if (workflowJson == null) workflowJson = row.workflow_json;
+      if (prompt == null) prompt = row.prompt;
+    }
+  }
+
+  return { workflow_json: workflowJson, prompt };
+}
+
 async function handleGeneratePrompt(body) {
-  const key = cacheKey(body);
+  // 1. Always load published catalog — this is the dispatch source of truth.
+  const catalog = await loadCatalogDefinition(body);
+  const key = cacheKey(body, catalog);
   const cached = cacheGet(key);
   if (cached) {
     return { ...cached, cached: true };
   }
 
-  let result = null;
   let baseline = body.workflow_id ? 'missing' : 'unknown';
   let baselineReason;
   let blockCategory;
-
+  let baselineStrategy;
   let hadBaselineRun = false;
 
+  // 2. Baseline/drift check against workflow_runs (trust gate only — never dispatch run prompt).
   if (body.workflow_id) {
     const { trustedRun, latestRun, recentRuns } = await fetchBaselineContextQueued(
       body.workflow_id
@@ -186,58 +219,60 @@ async function handleGeneratePrompt(body) {
     const baselineRun = trustedRun ?? latestRun;
     if (baselineRun?.prompt) {
       hadBaselineRun = true;
-      const evaluated = evaluateBaseline(baselineRun, latestRun, recentRuns, body);
+      const evaluated = evaluateBaseline(baselineRun, latestRun, recentRuns, {
+        ...body,
+        workflow_json: catalog.workflow_json ?? body.workflow_json,
+      });
       baseline = evaluated.baseline;
       baselineReason = evaluated.reason;
       blockCategory = evaluated.category;
-      result = {
-        prompt: baselineRun.prompt,
-        source: 'workflow_run',
-        strategy: evaluated.strategy,
-      };
+      baselineStrategy = evaluated.strategy;
     }
   }
 
-  if (!result || !result.prompt) {
-    let localBody = body;
-    if (body.workflow_id && body.workflow_json == null && body.prompt == null) {
-      const row = await fetchWorkflowDefinition(body.workflow_id);
-      if (row) {
-        localBody = {
-          workflow_id: body.workflow_id,
-          workflow_json: row.workflow_json,
-          prompt: row.prompt,
-        };
-      }
-    }
-    result = resolvePromptLocally(localBody);
+  // 3. Build dispatch prompt from workflows catalog (same as UI).
+  const local = resolvePromptLocally({
+    workflow_json: catalog.workflow_json,
+    prompt: catalog.prompt,
+  });
 
-    // Prompt builds from workflows row but no trusted UI run yet → missing baseline,
-    // not "prompt generation failed".
-    if (result?.prompt && body.workflow_id && !hadBaselineRun) {
-      baseline = 'missing';
-      baselineReason =
-        'No trusted baseline found — Run + Publish in the Floyo editor to create one.';
-      blockCategory = 'unverified';
-    }
+  let result = null;
+  if (local?.prompt) {
+    result = {
+      prompt: local.prompt,
+      source: 'workflows',
+      strategy: baselineStrategy
+        ? `catalog_${local.strategy}+${baselineStrategy}`
+        : `catalog_${local.strategy}`,
+      reason: local.reason,
+    };
   }
 
-  if (result?.prompt) {
-    const communityBlock = await checkCommunityInputsBlock(result.prompt);
-    if (communityBlock) {
-      baseline = communityBlock.baseline;
-      baselineReason = communityBlock.reason;
-      blockCategory = communityBlock.category;
+  if (result?.prompt && body.workflow_id && !hadBaselineRun) {
+    baseline = 'missing';
+    baselineReason =
+      'No trusted baseline found — Run + Publish in the Floyo editor to create one.';
+    blockCategory = 'unverified';
+  }
+
+  // 4. File check on the catalog prompt (#inputs + #community_inputs).
+  // Only applied when baseline would otherwise allow queue (exact/unknown).
+  if (result?.prompt && (baseline === 'exact' || baseline === 'unknown')) {
+    const fileBlock = await checkPromptFilesBlock(result.prompt);
+    if (fileBlock) {
+      baseline = fileBlock.baseline;
+      baselineReason = fileBlock.reason;
+      blockCategory = fileBlock.category;
     }
   }
 
   const trusted = baseline === 'exact';
   const response = {
-    success: !!result.prompt && isApiPromptShape(result.prompt),
-    prompt: result.prompt,
-    source: result.source,
-    strategy: result.strategy,
-    reason: baselineReason ?? result.reason,
+    success: !!result?.prompt && isApiPromptShape(result.prompt),
+    prompt: result?.prompt ?? null,
+    source: result?.source ?? 'none',
+    strategy: result?.strategy,
+    reason: baselineReason ?? result?.reason,
     baseline,
     trusted,
     category: blockCategory,
@@ -245,15 +280,21 @@ async function handleGeneratePrompt(body) {
     cached: false,
   };
 
-  // Do not cache "missing baseline" from stored-prompt fallback — often a transient DB miss under load.
+  // Do not cache "missing baseline" from empty catalog — often a transient DB miss under load.
   const suspiciousMissing =
-    baseline === 'missing' && result?.source === 'stored' && !!body.workflow_id;
+    baseline === 'missing' && result?.source === 'workflows' && !!body.workflow_id && !catalog.prompt;
 
   if (response.success && !suspiciousMissing) {
     const ttlMs = trusted ? 10 * 60 * 1000 : 5 * 60 * 1000;
     cacheSet(key, response, ttlMs, {
       workflowId: body.workflow_id || null,
-      status: trusted ? 'trusted' : baseline === 'outdated' ? 'outdated' : 'blocked',
+      status: trusted
+        ? 'trusted'
+        : baseline === 'outdated'
+          ? 'outdated'
+          : baseline === 'community_input_missing' || blockCategory === 'invalid_prompt_files'
+            ? 'blocked'
+            : 'blocked',
     });
   }
 

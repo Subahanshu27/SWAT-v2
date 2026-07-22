@@ -377,13 +377,19 @@ export async function queueBatch(
 
       if (!ok) {
         const isInfra = [401, 403, 408, 429, 500, 502, 503, 504].includes(status);
-        const category: ErrorCategory = isInfra ? 'infra_error' : 'genuine_workflow_error';
         const errorMessage =
           typeof responseData === 'string'
             ? responseData
             : (responseData as { error?: string })?.error || `HTTP ${status}`;
+        const errorCode =
+          responseData && typeof responseData === 'object' && !Array.isArray(responseData)
+            ? String((responseData as { error_code?: string }).error_code || '')
+            : '';
+        const isMissingFiles =
+          errorCode === 'invalid_prompt_files' ||
+          /not found in storage|storage metadata/i.test(errorMessage);
 
-        await markFailed(client, batchWorkflowId, category, errorMessage, {
+        const details = {
           status_code: status,
           status_text: statusText,
           response: responseData,
@@ -395,7 +401,16 @@ export async function queueBatch(
           dispatch_attempts: attempts,
           retried_from: retriedFrom,
           timestamp: new Date().toISOString(),
-        });
+        };
+
+        let category: ErrorCategory;
+        if (isMissingFiles) {
+          category = 'invalid_prompt_files';
+          await markBlocked(client, batchWorkflowId, category, errorMessage, details);
+        } else {
+          category = isInfra ? 'infra_error' : 'genuine_workflow_error';
+          await markFailed(client, batchWorkflowId, category, errorMessage, details);
+        }
         if (promptId) {
           await client
             .schema('swat')

@@ -87,7 +87,8 @@ export function RunDetailsModal({ workflow, onClose }: RunDetailsModalProps) {
     category === 'prompt_baseline_missing' ||
     category === 'prompt_baseline_stale' ||
     category === 'prompt_baseline_outdated' ||
-    category === 'community_input_missing';
+    category === 'community_input_missing' ||
+    category === 'invalid_prompt_files';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>

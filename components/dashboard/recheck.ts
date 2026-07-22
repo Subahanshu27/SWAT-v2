@@ -14,6 +14,7 @@ const STALE_CATEGORIES = [
   'prompt_baseline_stale',
   'prompt_baseline_outdated',
   'community_input_missing',
+  'invalid_prompt_files',
 ];
 
 export function isRecheckableCategory(category: string): boolean {

@@ -4,95 +4,78 @@
 The prompt-service classifies each workflow before SWAT dispatches it to the GPU.
 This prevents wasting dispatcher calls on workflows that are guaranteed to fail.
 
-## Data Sources
-- `workflows.workflow_json` — the published blueprint (from Supabase)
-- `workflows.prompt` — stored API prompt (used when preflight sends `workflow_id` only and no runs exist yet)
-- `workflow_runs.prompt` — the actual GPU payload from past runs (fetched by prompt-service)
-- `workflow_runs` metadata — success/failure status, timestamps
+## Sources of truth
+
+| Concern | Source |
+|---------|--------|
+| **Dispatch prompt / graph** | `workflows.prompt` + `workflows.workflow_json` (same as Floyo UI) |
+| **Baseline / drift check** | `workflow_runs` (trusted successful runs) — compare only, never dispatch |
+| **File existence** | Paths in the **catalog** prompt vs `file_system_items` |
 
 ## Classification Flow
 
 ```
-Workflow arrives for preflight
+Workflow arrives for preflight / queue
         │
         ▼
-  Fetch last N runs from workflow_runs
+  Load published catalog from workflows table
+  (prompt + workflow_json)  ← DISPATCH SOURCE
         │
         ▼
-  Any successful runs with unchanged workflow_json?
+  Fetch trusted / recent runs from workflow_runs
+  (baseline gate only)
+        │
+        ▼
+  Any successful trusted run?
        │               │
       YES              NO
-       │               └──▶ UNVERIFIED (no trusted baseline)
+       │               └──▶ UNVERIFIED / missing (block)
        ▼
-  "Trusted" baseline = most recent successful run with unchanged workflow_json
-        │
-        ▼
-  Compare current published prompt vs trusted baseline prompt
+  Classify vs published graph (prompt_changed / graph match)
        │                    │
-    IDENTICAL            DIFFERENT
-       │                    └──▶ Has workflow_json also changed?
-       │                            │           │
-       │                           YES          NO
-       │                            │           └──▶ VERIFIED_UNCHANGED_INPUT_CHANGED (stale)
-       │                            └──▶ VERIFIED_CHANGED (stale)
+    EXACT                STALE / OUTDATED
+       │                    └──▶ BLOCK (Run + Publish)
        ▼
-  Check for outdated infra fields
-  (trusted prompt missing fields that recent graph-stable runs have)
-       │              │
-    FIELDS OK      MISSING FIELDS
-       │              └──▶ PROMPT_BASELINE_OUTDATED
-       ▼
-  Check #community_inputs/ file references exist in file_system_items
-  (full_path e.g. community_inputs/abc/file.png — NOT a Supabase Storage bucket)
+  Check file refs in CATALOG prompt:
+    #community_inputs/*  AND  #inputs/*
+  against file_system_items
        │              │
     ALL EXIST      MISSING FILES
-       │              └──▶ COMMUNITY_INPUT_MISSING
+       │              └──▶ invalid_prompt_files (block — not queueable)
        ▼
-  VERIFIED_UNCHANGED_INPUT_UNCHANGED ✅ (queueable)
+  QUEUEABLE ✅
+  Dispatch uses workflows.prompt (NOT workflow_runs.prompt)
 ```
 
-## "Outdated" Detection Detail
-- Compares the trusted prompt's field set against recent runs that have the same graph structure
-- Ignores user-varying fields that are expected to differ between runs:
-  - Default ignore list: `image`, `seed`, `text`, `noise_seed`, `rand_seed`
-  - Configurable via `config/baseline-ignore-fields.json` (see below)
-- If trusted prompt is MISSING fields that recent stable runs HAVE → outdated
-- Example: Flux Inpaint baseline from May was missing `device_mode` field added in June
+## Why not dispatch from workflow_runs?
 
-## Configurable Ignore Fields
-File: `prompt-service/config/baseline-ignore-fields.json`
+Older SWAT2 used the golden-run prompt for dispatch. That caused false failures when
+`workflows` had been updated to `#community_inputs/` but the trusted run still
+referenced `#inputs/`. Dispatch must match what the UI loads: the **workflows** row.
 
-Maps workflow type → fields to ignore during outdated detection.
-`_default` applies when no specific type match is found.
+`workflow_runs` remains the drift/trust check only.
 
-Workflow type is inferred from node `class_type` values in `workflow_json` (flux_inpaint, nano_banana, seedance, etc.).
+## File check detail
+
+- Extracts both `#community_inputs/` and `#inputs/` from the catalog prompt
+- Looks up `file_system_items.full_path` (strip leading `#`)
+- `community_inputs/...` → require `team_id IS NULL` (published)
+- `inputs/...` → any non-deleted row with storage_object_id
+- Missing → block with category `invalid_prompt_files` (baseline `community_input_missing`)
 
 ## How to Fix Each Category
 
 | Category | User Action |
 |---|---|
-| Stale (input changed) | Run + Publish the workflow in Floyo editor |
-| Stale (graph changed) | Run + Publish the workflow in Floyo editor |
-| Unverified | Run + Publish the workflow in Floyo editor |
-| Outdated | Run + Publish the workflow in Floyo editor |
-| Community input missing | Re-upload the missing file in Floyo editor, then Run + Publish |
-
-**Important:** Manual API paste into `workflows.prompt` does NOT work.
-It bypasses `workflow_runs` and the baseline will still mismatch.
-The ONLY reliable fix is Run + Publish through the Floyo UI.
+| Stale / outdated / unverified | Run + Publish in the Floyo editor |
+| invalid_prompt_files / missing files | Fix or re-upload referenced files, then Run + Publish |
+| Manual paste into `workflows.prompt` | Does NOT refresh baseline — still need a trusted run |
 
 ## Cache Behavior
-- prompt-service caches responses in RAM (see `lib/cache.js`)
-- TTL: 10 minutes for trusted results, 5 minutes for blocked results
-- Key: hash of `workflow_id + workflow_json + prompt + mode`
-- Cache stats available at `GET /cache/stats`
-- Clear all: `POST /cache/clear`
-- Clear one workflow: `POST /cache/clear-workflow` with `{ "workflow_id": "..." }`
-
-## Performance
-- Parallel preflight with configurable concurrency (`SWAT_PREFLIGHT_CONCURRENCY`, default 8)
-- Smart pagination stop when trusted + 30 recent runs found
-- Cache prevents redundant Supabase calls within TTL window
+- Key includes catalog prompt fingerprint so Publish (prompt change) invalidates naturally
+- TTL: 10 minutes trusted, 5 minutes blocked
+- Clear one workflow: `POST /cache/clear-workflow` `{ "workflow_id": "..." }`
+- SWAT Re-check clears cache for that workflow before re-running preflight
 
 ## Dispatcher Retry
 SWAT retries dispatcher calls once on 5xx or network timeout (not on 4xx).

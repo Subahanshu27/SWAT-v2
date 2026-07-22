@@ -52,7 +52,8 @@ export const CATEGORY_LABEL: Record<ErrorCategory, string> = {
   prompt_baseline_missing: 'Needs baseline',
   prompt_baseline_stale: 'Stale baseline',
   prompt_baseline_outdated: 'Outdated baseline',
-  community_input_missing: 'Missing community file',
+  community_input_missing: 'Missing input files',
+  invalid_prompt_files: 'Missing prompt files',
   infra_error: 'SWAT / infra error',
 };
 
@@ -67,6 +68,7 @@ export function categoryColor(category: ErrorCategory): string {
     case 'prompt_baseline_stale':
     case 'prompt_baseline_outdated':
     case 'community_input_missing':
+    case 'invalid_prompt_files':
       return 'bg-violet-500/15 text-violet-300 border-violet-500/40';
     case 'infra_error':
       return 'bg-orange-500/15 text-orange-300 border-orange-500/40';

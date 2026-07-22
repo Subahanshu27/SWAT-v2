@@ -22,6 +22,7 @@ const BASELINE_CATEGORIES: ErrorCategory[] = [
   'prompt_baseline_stale',
   'prompt_baseline_outdated',
   'community_input_missing',
+  'invalid_prompt_files',
 ];
 
 function countByCategory(items: PreflightItem[], blocked: boolean) {
